@@ -1,0 +1,161 @@
+version: '3.8'
+
+services:
+  # PostgreSQL数据库
+  postgres:
+    image: postgres:15-alpine
+    container_name: marketing-ai-postgres
+    environment:
+      POSTGRES_USER: marketing_ai_user
+      POSTGRES_PASSWORD: marketing_ai_password
+      POSTGRES_DB: marketing_ai_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - marketing-ai-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marketing_ai_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis缓存和队列
+  redis:
+    image: redis:7-alpine
+    container_name: marketing-ai-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - marketing-ai-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # 后端Nest.js应用
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: marketing-ai-backend
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://marketing_ai_user:marketing_ai_password@postgres:5432/marketing_ai_db
+      REDIS_URL: redis://redis:6379
+      AUTH0_DOMAIN: ${AUTH0_DOMAIN}
+      AUTH0_AUDIENCE: ${AUTH0_AUDIENCE}
+      AUTH0_CLIENT_ID: ${AUTH0_CLIENT_ID}
+      AUTH0_CLIENT_SECRET: ${AUTH0_CLIENT_SECRET}
+      ZHIPU_API_KEY: ${ZHIPU_API_KEY}
+      JWT_SECRET: ${JWT_SECRET:-default_jwt_secret_change_in_production}
+      PORT: 3000
+    volumes:
+      - ../backend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - marketing-ai-network
+    restart: unless-stopped
+    command: npm run start:dev
+
+  # 前端Vue应用
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: marketing-ai-frontend
+    environment:
+      NODE_ENV: development
+      VITE_API_BASE_URL: http://localhost:3000
+      VITE_AUTH0_DOMAIN: ${AUTH0_DOMAIN}
+      VITE_AUTH0_CLIENT_ID: ${AUTH0_CLIENT_ID}
+      VITE_AUTH0_AUDIENCE: ${AUTH0_AUDIENCE}
+      VITE_AUTH0_REDIRECT_URI: http://localhost:5173/callback
+      VITE_AUTH0_LOGOUT_REDIRECT_URI: http://localhost:5173
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    networks:
+      - marketing-ai-network
+    restart: unless-stopped
+    command: npm run dev -- --host
+
+  # Nginx反向代理（生产环境）
+  nginx:
+    image: nginx:alpine
+    container_name: marketing-ai-nginx
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ../frontend/dist:/usr/share/nginx/html
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - marketing-ai-network
+    restart: unless-stopped
+
+  # Prisma Studio数据库管理
+  prisma-studio:
+    image: node:18-alpine
+    container_name: marketing-ai-prisma-studio
+    working_dir: /app
+    volumes:
+      - ../backend:/app
+    environment:
+      DATABASE_URL: postgresql://marketing_ai_user:marketing_ai_password@postgres:5432/marketing_ai_db
+    ports:
+      - "5555:5555"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - marketing-ai-network
+    command: npx prisma studio --host 0.0.0.0 --port 5555
+    restart: unless-stopped
+
+  # Redis Commander管理界面
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: marketing-ai-redis-commander
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - marketing-ai-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  marketing-ai-network:
+    driver: bridge

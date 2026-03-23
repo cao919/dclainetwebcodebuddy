@@ -1,0 +1,191 @@
+version: '3.8'
+
+services:
+  # PostgreSQL数据库（生产）
+  postgres:
+    image: postgres:15-alpine
+    container_name: marketing-ai-postgres-prod
+    environment:
+      POSTGRES_USER: ${DB_USER:-marketing_ai_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-marketing_ai_password}
+      POSTGRES_DB: ${DB_NAME:-marketing_ai_db}
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - marketing-ai-network-prod
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-marketing_ai_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  # Redis缓存和队列（生产）
+  redis:
+    image: redis:7-alpine
+    container_name: marketing-ai-redis-prod
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_password}
+    volumes:
+      - redis_data_prod:/data
+    networks:
+      - marketing-ai-network-prod
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_password}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  # 后端Nest.js应用（生产）
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.prod
+    container_name: marketing-ai-backend-prod
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${DB_USER:-marketing_ai_user}:${DB_PASSWORD:-marketing_ai_password}@postgres:5432/${DB_NAME:-marketing_ai_db}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379
+      AUTH0_DOMAIN: ${AUTH0_DOMAIN}
+      AUTH0_AUDIENCE: ${AUTH0_AUDIENCE}
+      AUTH0_CLIENT_ID: ${AUTH0_CLIENT_ID}
+      AUTH0_CLIENT_SECRET: ${AUTH0_CLIENT_SECRET}
+      ZHIPU_API_KEY: ${ZHIPU_API_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      PORT: 3000
+    networks:
+      - marketing-ai-network-prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+
+  # 前端Vue应用（生产）
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile.prod
+    container_name: marketing-ai-frontend-prod
+    environment:
+      NODE_ENV: production
+      VITE_API_BASE_URL: ${API_BASE_URL}
+      VITE_AUTH0_DOMAIN: ${AUTH0_DOMAIN}
+      VITE_AUTH0_CLIENT_ID: ${AUTH0_CLIENT_ID}
+      VITE_AUTH0_AUDIENCE: ${AUTH0_AUDIENCE}
+      VITE_AUTH0_REDIRECT_URI: ${FRONTEND_URL}/callback
+      VITE_AUTH0_LOGOUT_REDIRECT_URI: ${FRONTEND_URL}
+    networks:
+      - marketing-ai-network-prod
+    restart: always
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+
+  # Nginx反向代理（生产）
+  nginx:
+    image: nginx:alpine
+    container_name: marketing-ai-nginx-prod
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf
+      - ./nginx/conf.d.prod:/etc/nginx/conf.d
+      - ../frontend/dist:/usr/share/nginx/html
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - marketing-ai-network-prod
+    depends_on:
+      - backend
+      - frontend
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  # 监控 - Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: marketing-ai-prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - marketing-ai-network-prod
+    ports:
+      - "9090:9090"
+    restart: always
+
+  # 监控 - Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: marketing-ai-grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - marketing-ai-network-prod
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    restart: always
+
+volumes:
+  postgres_data_prod:
+    driver: local
+  redis_data_prod:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  marketing-ai-network-prod:
+    driver: bridge

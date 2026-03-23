@@ -1,0 +1,294 @@
+// Marketing AI Agent System Database Schema
+// Version: 1.0.0
+// Description: Core database schema for marketing AI workflow system
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  extensions = [pg_trgm, uuid_ossp]
+}
+
+// ======================
+// 核心模型
+// ======================
+
+// 营销任务主表
+model MarketingTask {
+  id              String   @id @default(uuid()) @db.Uuid
+  name            String   @db.VarChar(255)
+  description     String?  @db.Text
+  status          TaskStatus @default(draft)
+  targetAudience  Json?
+  budget          Decimal? @db.Decimal(10, 2)
+  startDate       DateTime?
+  endDate         DateTime?
+  createdBy       String   @db.VarChar(100)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // 关系
+  stages          TaskStageOutput[] @relation("TaskStages", onDelete: Cascade)
+  creatives       AdCreative[] @relation("TaskCreatives", onDelete: Cascade)
+
+  // 索引
+  @@index([status])
+  @@index([createdBy])
+  @@index([createdAt])
+  @@index([startDate, endDate])
+  
+  // 映射到数据库表名
+  @@map("marketing_task")
+}
+
+// 任务阶段输出表
+model TaskStageOutput {
+  id        String   @id @default(uuid()) @db.Uuid
+  taskId    String   @db.Uuid
+  stage     TaskStage
+  output    Json
+  status    StageStatus @default(pending)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 关系
+  task      MarketingTask @relation("TaskStages", fields: [taskId], references: [id])
+
+  // 索引
+  @@index([taskId])
+  @@index([stage])
+  @@index([status])
+  @@unique([taskId, stage])
+  
+  // 映射到数据库表名
+  @@map("task_stage_output")
+}
+
+// 广告创意表
+model AdCreative {
+  id          String        @id @default(uuid()) @db.Uuid
+  taskId      String        @db.Uuid
+  type        CreativeType
+  title       String?       @db.VarChar(255)
+  content     Json
+  aiGenerated Boolean       @default(true)
+  aiModel     String?       @db.VarChar(100)
+  status      CreativeStatus @default(draft)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // 关系
+  task        MarketingTask @relation("TaskCreatives", fields: [taskId], references: [id])
+  performances MarketingPerformance[] @relation("CreativePerformances", onDelete: Cascade)
+
+  // 索引
+  @@index([taskId])
+  @@index([type])
+  @@index([status])
+  @@index([aiGenerated])
+  @@index([createdAt])
+  
+  // 映射到数据库表名
+  @@map("ad_creative")
+}
+
+// 营销效果表
+model MarketingPerformance {
+  id          String   @id @default(uuid()) @db.Uuid
+  creativeId  String   @db.Uuid
+  metrics     Json
+  periodStart DateTime
+  periodEnd   DateTime
+  source      String?  @db.VarChar(100)
+  createdAt   DateTime @default(now())
+
+  // 关系
+  creative    AdCreative @relation("CreativePerformances", fields: [creativeId], references: [id])
+
+  // 索引
+  @@index([creativeId])
+  @@index([periodStart, periodEnd])
+  @@index([source])
+  
+  // 映射到数据库表名
+  @@map("marketing_performance")
+}
+
+// ======================
+// 系统扩展表
+// ======================
+
+// 用户表 (用于本地用户管理，与Auth0同步)
+model User {
+  id            String   @id @default(uuid()) @db.Uuid
+  auth0Id       String   @unique @db.VarChar(100)
+  email         String   @unique @db.VarChar(255)
+  name          String?  @db.VarChar(100)
+  picture       String?  @db.VarChar(500)
+  role          UserRole @default(user)
+  lastLoginAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // 关系
+  tasks         MarketingTask[] @relation("UserTasks")
+
+  // 索引
+  @@index([email])
+  @@index([role])
+  @@index([createdAt])
+  
+  // 映射到数据库表名
+  @@map("users")
+}
+
+// 系统配置表
+model SystemConfig {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique @db.VarChar(100)
+  value       Json
+  description String?  @db.VarChar(500)
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 索引
+  @@index([key])
+  @@index([isPublic])
+  
+  // 映射到数据库表名
+  @@map("system_config")
+}
+
+// 审计日志表
+model AuditLog {
+  id          String      @id @default(uuid()) @db.Uuid
+  userId      String?     @db.Uuid
+  action      String      @db.VarChar(100)
+  entityType  String?     @db.VarChar(100)
+  entityId    String?     @db.VarChar(100)
+  oldData     Json?
+  newData     Json?
+  ipAddress   String?     @db.VarChar(45)
+  userAgent   String?     @db.VarChar(500)
+  createdAt   DateTime    @default(now())
+
+  // 关系
+  user        User?       @relation(fields: [userId], references: [id])
+
+  // 索引
+  @@index([userId])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  
+  // 映射到数据库表名
+  @@map("audit_log")
+}
+
+// ======================
+// 枚举类型定义
+// ======================
+
+// 任务状态枚举
+enum TaskStatus {
+  draft      // 草稿
+  active     // 进行中
+  paused     // 已暂停
+  completed  // 已完成
+  failed     // 已失败
+  cancelled  // 已取消
+}
+
+// 任务阶段枚举 (8阶段工作流)
+enum TaskStage {
+  data_collection   // 1. 数据收集
+  market_analysis   // 2. 市场分析
+  strategy          // 3. 策略制定
+  planning          // 4. 计划编排
+  creative          // 5. 创意生成
+  execution         // 6. 执行部署
+  analysis          // 7. 效果分析
+  optimization      // 8. 优化迭代
+}
+
+// 阶段状态枚举
+enum StageStatus {
+  pending     // 等待中
+  processing  // 处理中
+  completed   // 已完成
+  failed      // 已失败
+  skipped     // 已跳过
+}
+
+// 创意类型枚举
+enum CreativeType {
+  text       // 文本创意
+  image      // 图片创意
+  video      // 视频创意
+  composite  // 复合创意
+  carousel   // 轮播创意
+  story      // 故事创意
+}
+
+// 创意状态枚举
+enum CreativeStatus {
+  draft      // 草稿
+  pending    // 待审核
+  approved   // 已批准
+  rejected   // 已拒绝
+  published  // 已发布
+  archived   // 已归档
+}
+
+// 用户角色枚举
+enum UserRole {
+  admin      // 管理员
+  manager    // 经理
+  marketer   // 营销专员
+  analyst    // 分析师
+  user       // 普通用户
+  guest      // 访客
+}
+
+// ======================
+// 视图定义
+// ======================
+
+// 任务概览视图
+view TaskOverview {
+  taskId          String   @db.Uuid
+  taskName        String   @db.VarChar(255)
+  taskStatus      TaskStatus
+  taskCreatedAt   DateTime
+  stagesCompleted Int
+  totalStages     Int      @default(8)
+  creativesCount  Int
+  lastStageUpdate DateTime?
+  
+  @@map("task_overview")
+}
+
+// 创意效果视图
+view CreativePerformanceView {
+  creativeId      String   @db.Uuid
+  creativeTitle   String?  @db.VarChar(255)
+  creativeType    CreativeType
+  taskId          String   @db.Uuid
+  taskName        String   @db.VarChar(255)
+  impressions     Int?
+  clicks          Int?
+  conversions     Int?
+  ctr             Float?
+  conversionRate  Float?
+  spend           Decimal? @db.Decimal(10, 2)
+  roi             Float?
+  periodStart     DateTime
+  periodEnd       DateTime
+  
+  @@map("creative_performance_view")
+}
