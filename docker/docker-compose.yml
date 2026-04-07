@@ -1,23 +1,23 @@
 version: '3.8'
 
 services:
-  # PostgreSQL数据库
-  postgres:
-    image: postgres:15-alpine
-    container_name: marketing-ai-postgres
+  # MySQL数据库
+  mysql:
+    image: mysql:8.0
+    container_name: marketing-ai-mysql
     environment:
-      POSTGRES_USER: marketing_ai_user
-      POSTGRES_PASSWORD: marketing_ai_password
-      POSTGRES_DB: marketing_ai_db
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: marketing_ai_db
+      MYSQL_USER: marketing_ai_user
+      MYSQL_PASSWORD: marketing_ai_password
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init-scripts:/docker-entrypoint-initdb.d
+      - mysql_data:/var/lib/mysql
     ports:
-      - "5432:5432"
+      - "3306:3306"
     networks:
       - marketing-ai-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U marketing_ai_user"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "marketing_ai_user", "-pmarketing_ai_password"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -49,7 +49,7 @@ services:
     container_name: marketing-ai-backend
     environment:
       NODE_ENV: development
-      DATABASE_URL: postgresql://marketing_ai_user:marketing_ai_password@postgres:5432/marketing_ai_db
+      DATABASE_URL: mysql://marketing_ai_user:marketing_ai_password@mysql:3306/marketing_ai_db
       REDIS_URL: redis://redis:6379
       AUTH0_DOMAIN: ${AUTH0_DOMAIN}
       AUTH0_AUDIENCE: ${AUTH0_AUDIENCE}
@@ -64,7 +64,7 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      postgres:
+      mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -125,11 +125,11 @@ services:
     volumes:
       - ../backend:/app
     environment:
-      DATABASE_URL: postgresql://marketing_ai_user:marketing_ai_password@postgres:5432/marketing_ai_db
+      DATABASE_URL: mysql://marketing_ai_user:marketing_ai_password@mysql:3306/marketing_ai_db
     ports:
       - "5555:5555"
     depends_on:
-      postgres:
+      mysql:
         condition: service_healthy
     networks:
       - marketing-ai-network
@@ -151,7 +151,7 @@ services:
     restart: unless-stopped
 
 volumes:
-  postgres_data:
+  mysql_data:
     driver: local
   redis_data:
     driver: local

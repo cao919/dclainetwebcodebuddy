@@ -1,19 +1,41 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ThrottlerModule } from '@nestjs/throttler';
-import { ScheduleModule } from '@nestjs/schedule';
-import { PrismaModule } from './database/prisma.module';
-import { AuthModule } from './auth/auth.module';
-import { TasksModule } from './modules/tasks/tasks.module';
-import { CreativesModule } from './modules/creatives/creatives.module';
-import { AnalyticsModule } from './modules/analytics/analytics.module';
-import { AiModule } from './modules/ai/ai.module';
-import { SystemModule } from './modules/system/system.module';
-import { HealthModule } from './health/health.module';
-import { BullModule } from '@nestjs/bull';
-import { EventEmitterModule } from '@nestjs/event-emitter';
+import { Module, Controller, Get } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import configuration from './config/configuration';
 import { validate } from './config/env.validation';
+
+// 导入各功能模块
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './modules/users/users.module';
+import { MarketingTasksModule } from './modules/marketing-tasks/marketing-tasks.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { PrismaModule } from './database/prisma.module';
+
+// 健康检查控制器
+@Controller('health')
+class HealthController {
+  @Get()
+  check() {
+    return {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      service: 'marketing-ai-backend',
+    };
+  }
+}
+
+// 测试控制器
+@Controller()
+class AppController {
+  @Get()
+  hello() {
+    return {
+      message: '营销AI智能体系统 API',
+      version: '1.0.0',
+      status: 'running',
+    };
+  }
+}
 
 @Module({
   imports: [
@@ -24,63 +46,16 @@ import { validate } from './config/env.validation';
       validate,
       envFilePath: ['.env', '.env.local'],
     }),
-
-    // 速率限制
-    ThrottlerModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        throttlers: [
-          {
-            ttl: config.get<number>('throttler.ttl', 60000),
-            limit: config.get<number>('throttler.limit', 100),
-          },
-        ],
-      }),
-    }),
-
-    // 定时任务
-    ScheduleModule.forRoot(),
-
-    // 事件发射器
-    EventEmitterModule.forRoot(),
-
-    // Redis队列
-    BullModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        redis: {
-          host: config.get<string>('redis.host', 'localhost'),
-          port: config.get<number>('redis.port', 6379),
-          password: config.get<string>('redis.password'),
-        },
-        defaultJobOptions: {
-          removeOnComplete: true,
-          attempts: 3,
-          backoff: {
-            type: 'exponential',
-            delay: 5000,
-          },
-        },
-      }),
-    }),
-
     // 数据库模块
     PrismaModule,
-
-    // 业务模块
+    // 功能模块
     AuthModule,
-    TasksModule,
-    CreativesModule,
+    UsersModule,
+    MarketingTasksModule,
+    DashboardModule,
     AnalyticsModule,
-    AiModule,
-    SystemModule,
-    
-    // 健康检查模块
-    HealthModule,
   ],
-  controllers: [],
+  controllers: [HealthController, AppController],
   providers: [],
 })
 export class AppModule {}

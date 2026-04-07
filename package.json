@@ -34,7 +34,8 @@
     "prisma:studio": "cd backend && npx prisma studio"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "sass-embedded": "^1.98.0"
   },
   "keywords": [
     "marketing",

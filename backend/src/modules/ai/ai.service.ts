@@ -15,8 +15,8 @@ export class AiService {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
   ) {
-    this.apiKey = this.configService.get<string>('zhipuAi.apiKey');
-    this.baseUrl = this.configService.get<string>('zhipuAi.baseUrl');
+    this.apiKey = this.configService.get<string>('zhipuAi.apiKey') || '';
+    this.baseUrl = this.configService.get<string>('zhipuAi.baseUrl') || 'https://open.bigmodel.cn/api/paas/v4';
     this.textModel = this.configService.get<string>('zhipuAi.textModel', 'glm-4');
     this.imageModel = this.configService.get<string>('zhipuAi.imageModel', 'cogview-3');
   }

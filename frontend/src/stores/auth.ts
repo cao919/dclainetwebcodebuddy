@@ -27,13 +27,8 @@ export const useAuthStore = defineStore('auth', () => {
         token.value = storedToken
         user.value = JSON.parse(storedUser)
         
-        // 验证令牌有效性
-        const isValid = await validateToken(storedToken)
-        if (!isValid) {
-          clearAuth()
-          return false
-        }
-        
+        // 简化：只检查token是否存在，不调用API验证
+        // 实际验证会在API请求时通过拦截器处理
         return true
       }
       

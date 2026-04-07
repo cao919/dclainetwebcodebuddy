@@ -6,17 +6,17 @@ export async function authGuard(to: RouteLocationNormalized, from: RouteLocation
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
   
   // 检查认证状态
-  await authStore.checkAuth()
+  const isAuthenticated = await authStore.checkAuth()
   
-  if (requiresAuth && !authStore.isAuthenticated) {
-    // 需要认证但未登录，重定向到登录页
+  if (requiresAuth && !isAuthenticated) {
+    // 需要认证但未登录，重定向到登录页，默认跳转到仪表盘
     next({
       path: '/auth/login',
-      query: { redirect: to.fullPath },
+      query: { redirect: '/dashboard' },
     })
-  } else if (!requiresAuth && authStore.isAuthenticated && to.path === '/auth/login') {
-    // 已登录但访问登录页，重定向到首页
-    next({ path: '/' })
+  } else if (!requiresAuth && isAuthenticated && to.path === '/auth/login') {
+    // 已登录但访问登录页，重定向到仪表盘
+    next({ path: '/dashboard' })
   } else {
     // 检查用户权限
     if (requiresAuth && to.meta.roles) {

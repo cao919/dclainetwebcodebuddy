@@ -16,12 +16,20 @@ export class AuthService {
     private readonly usersService: UsersService,
   ) {
     // 初始化Auth0管理客户端
+    const domain = this.configService.get<string>('auth0.domain');
+    const clientId = this.configService.get<string>('auth0.clientId');
+    const clientSecret = this.configService.get<string>('auth0.clientSecret');
+    
+    if (!domain || !clientId || !clientSecret) {
+      console.warn('Auth0 configuration is incomplete. Auth0 features will be disabled.');
+      return;
+    }
+    
     this.auth0Management = new ManagementClient({
-      domain: this.configService.get<string>('auth0.domain'),
-      clientId: this.configService.get<string>('auth0.clientId'),
-      clientSecret: this.configService.get<string>('auth0.clientSecret'),
-      scope: 'read:users update:users',
-    });
+      domain,
+      clientId,
+      clientSecret,
+    } as any);
   }
 
   /**

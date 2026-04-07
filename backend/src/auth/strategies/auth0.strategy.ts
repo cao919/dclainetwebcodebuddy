@@ -11,17 +11,25 @@ export class Auth0Strategy extends PassportStrategy(JwtStrategy, 'auth0') {
     private readonly configService: ConfigService,
     private readonly usersService: UsersService,
   ) {
+    const jwksUri = configService.get<string>('auth0.jwksUri');
+    const audience = configService.get<string>('auth0.audience');
+    const issuer = configService.get<string>('auth0.issuer');
+    
+    if (!jwksUri || !audience || !issuer) {
+      throw new Error('Auth0 configuration is incomplete');
+    }
+    
     super({
       secretOrKeyProvider: passportJwtSecret({
         cache: true,
         rateLimit: true,
         jwksRequestsPerMinute: 5,
-        jwksUri: configService.get<string>('auth0.jwksUri'),
+        jwksUri,
       }),
 
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      audience: configService.get<string>('auth0.audience'),
-      issuer: configService.get<string>('auth0.issuer'),
+      audience,
+      issuer,
       algorithms: ['RS256'],
     });
   }

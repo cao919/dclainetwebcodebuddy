@@ -5,8 +5,10 @@ import 'element-plus/dist/index.css'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import App from './App.vue'
 import router from './router'
-import { auth0 } from './auth/auth0'
+// import { auth0 } from './auth/auth0'
 import './styles/main.scss'
+import './styles/digital-command-center.scss'
+import './styles/element-override.scss'
 
 const app = createApp(App)
 
@@ -18,6 +20,6 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 app.use(createPinia())
 app.use(router)
 app.use(ElementPlus)
-app.use(auth0)
+// app.use(auth0)
 
 app.mount('#app')

@@ -17,10 +17,18 @@ const AnalyticsView = () => import('@/views/analytics/AnalyticsView.vue')
 const ProfileView = () => import('@/views/profile/ProfileView.vue')
 const NotFoundView = () => import('@/views/error/NotFoundView.vue')
 
+const SimpleLogin = () => import('@/views/auth/SimpleLogin.vue')
+
 const routes: Array<RouteRecordRaw> = [
   {
     path: '/',
     redirect: '/dashboard',
+  },
+  {
+    path: '/simple-login',
+    name: 'SimpleLogin',
+    component: SimpleLogin,
+    meta: { title: '简单登录', requiresAuth: false },
   },
   {
     path: '/auth',
@@ -71,10 +79,22 @@ const routes: Array<RouteRecordRaw> = [
         meta: { title: '创意工坊', icon: 'creative' },
       },
       {
+        path: 'creatives/:id',
+        name: 'TaskCreatives',
+        component: CreativesView,
+        meta: { title: '任务创意工坊', hidden: true },
+      },
+      {
         path: 'analytics',
         name: 'Analytics',
         component: AnalyticsView,
         meta: { title: '效果分析', icon: 'analytics' },
+      },
+      {
+        path: 'analytics/:taskId',
+        name: 'TaskAnalytics',
+        component: AnalyticsView,
+        meta: { title: '任务效果分析', hidden: true },
       },
       {
         path: 'profile',

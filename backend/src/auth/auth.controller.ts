@@ -9,6 +9,7 @@ import {
   HttpStatus,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Request as ExpressRequest } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -23,11 +24,15 @@ import { Auth0AuthGuard } from './guards/auth0-auth.guard';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { Auth0CallbackDto } from './dto/auth0-callback.dto';
+import { UsersService } from '../modules/users/users.service';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly usersService: UsersService,
+  ) {}
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -39,8 +44,8 @@ export class AuthController {
     schema: {
       type: 'object',
       properties: {
-        accessToken: { type: 'string' },
-        refreshToken: { type: 'string' },
+        access_token: { type: 'string' },
+        refresh_token: { type: 'string' },
         user: {
           type: 'object',
           properties: {
@@ -56,9 +61,36 @@ export class AuthController {
   })
   @ApiResponse({ status: 401, description: '认证失败' })
   async login(@Body() loginDto: LoginDto) {
-    // 注意：实际项目中，这里应该验证用户名密码
-    // 简化实现：直接使用Auth0回调
-    throw new UnauthorizedException('请使用Auth0登录');
+    // 开发测试模式：允许任意邮箱密码登录
+    // 实际项目中应该验证用户名密码
+    
+    // 查找或创建用户
+    let user = await this.usersService.findByEmail(loginDto.email);
+    
+    if (!user) {
+      // 创建测试用户
+      user = await this.usersService.create({
+        email: loginDto.email,
+        name: loginDto.email.split('@')[0],
+        role: 'user',
+        auth0Id: `local_${Date.now()}`,
+      });
+    }
+    
+    // 生成JWT令牌
+    const tokens = await this.authService.generateToken(user);
+    
+    return {
+      access_token: tokens.accessToken,
+      refresh_token: tokens.refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        picture: user.picture,
+      },
+    };
   }
 
   @Post('auth0/callback')
@@ -97,26 +129,29 @@ export class AuthController {
   @ApiBody({ type: RefreshTokenDto })
   @ApiResponse({
     status: 200,
-    description: '令牌刷新成功',
+    description: '刷新成功',
     schema: {
       type: 'object',
       properties: {
-        accessToken: { type: 'string' },
+        access_token: { type: 'string' },
       },
     },
   })
-  @ApiResponse({ status: 401, description: '刷新令牌无效' })
-  async refreshToken(@Body() refreshTokenDto: RefreshTokenDto) {
-    return this.authService.refreshToken(refreshTokenDto.refreshToken);
+  @ApiResponse({ status: 401, description: '无效的刷新令牌' })
+  async refresh(@Body() refreshTokenDto: RefreshTokenDto) {
+    const result = await this.authService.refreshToken(refreshTokenDto.refreshToken);
+    return {
+      access_token: result.accessToken,
+    };
   }
 
   @Get('profile')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('jwt')
-  @ApiOperation({ summary: '获取当前用户信息' })
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '获取用户信息' })
   @ApiResponse({
     status: 200,
-    description: '获取用户信息成功',
+    description: '获取成功',
     schema: {
       type: 'object',
       properties: {
@@ -125,76 +160,23 @@ export class AuthController {
         name: { type: 'string' },
         role: { type: 'string' },
         picture: { type: 'string' },
-        createdAt: { type: 'string', format: 'date-time' },
-        lastLoginAt: { type: 'string', format: 'date-time' },
       },
     },
   })
   @ApiResponse({ status: 401, description: '未授权' })
-  async getProfile(@Request() req) {
-    return this.authService.getUserProfile(req.user.id);
+  async getProfile(@Request() req: ExpressRequest) {
+    const userId = (req as any).user?.sub;
+    return this.authService.getUserProfile(userId);
   }
 
   @Post('logout')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiBearerAuth('jwt')
   @ApiOperation({ summary: '用户登出' })
-  @ApiResponse({
-    status: 200,
-    description: '登出成功',
-    schema: {
-      type: 'object',
-      properties: {
-        message: { type: 'string' },
-      },
-    },
-  })
-  async logout(@Request() req) {
-    return this.authService.logout(req.user.id);
-  }
-
-  @Get('test-auth0')
-  @UseGuards(Auth0AuthGuard)
-  @ApiBearerAuth('auth0')
-  @ApiOperation({ summary: '测试Auth0保护路由' })
-  @ApiResponse({
-    status: 200,
-    description: 'Auth0认证成功',
-    schema: {
-      type: 'object',
-      properties: {
-        message: { type: 'string' },
-        user: { type: 'object' },
-      },
-    },
-  })
-  async testAuth0(@Request() req) {
-    return {
-      message: 'Auth0认证成功',
-      user: req.user,
-    };
-  }
-
-  @Get('test-jwt')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('jwt')
-  @ApiOperation({ summary: '测试JWT保护路由' })
-  @ApiResponse({
-    status: 200,
-    description: 'JWT认证成功',
-    schema: {
-      type: 'object',
-      properties: {
-        message: { type: 'string' },
-        user: { type: 'object' },
-      },
-    },
-  })
-  async testJwt(@Request() req) {
-    return {
-      message: 'JWT认证成功',
-      user: req.user,
-    };
+  @ApiResponse({ status: 200, description: '登出成功' })
+  async logout(@Request() req: ExpressRequest) {
+    // 这里可以实现令牌黑名单等逻辑
+    return { message: '登出成功' };
   }
 }

@@ -1,0 +1,172 @@
+// Digital Command Center 风格变量
+// 数字指挥中心 - 深色模式 + 毛玻璃效果
+
+:root {
+  // 背景色
+  --dcc-bg-primary: hsl(222 47% 11%);      // 深空蓝灰基底
+  --dcc-bg-secondary: hsl(222 47% 14%);    // 次级背景
+  --dcc-bg-card: hsla(222 47% 16% / 0.7);  // 玻璃态卡片背景
+  --dcc-bg-card-hover: hsla(222 47% 18% / 0.8);
+  --dcc-bg-input: hsla(222 47% 12% / 0.8);
+  
+  // 边框色
+  --dcc-border-color: hsla(210 40% 50% / 0.2);
+  --dcc-border-color-hover: hsla(190 100% 50% / 0.3);
+  
+  // 文字色
+  --dcc-text-primary: #ffffff;
+  --dcc-text-secondary: hsl(215 25% 65%);
+  --dcc-text-muted: hsl(215 20% 50%);
+  
+  // 强调色 - 霓虹流光
+  --dcc-accent-cyan: #00d4ff;              // 电光青
+  --dcc-accent-purple: #a855f7;            // 电光紫
+  --dcc-accent-green: #10b981;             // 成功绿
+  --dcc-accent-orange: #f59e0b;            // 警告橙
+  --dcc-accent-red: #ef4444;               // 错误红
+  
+  // 渐变
+  --dcc-gradient-primary: linear-gradient(135deg, var(--dcc-accent-cyan) 0%, var(--dcc-accent-purple) 100%);
+  --dcc-gradient-success: linear-gradient(135deg, var(--dcc-accent-green) 0%, #34d399 100%);
+  --dcc-gradient-warning: linear-gradient(135deg, var(--dcc-accent-orange) 0%, #fbbf24 100%);
+  
+  // 阴影
+  --dcc-shadow-sm: 0 2px 4px -1px hsla(0 0% 0% / 0.1);
+  --dcc-shadow-md: 0 4px 6px -1px hsla(0 0% 0% / 0.1), 0 2px 4px -1px hsla(0 0% 0% / 0.06);
+  --dcc-shadow-lg: 0 10px 15px -3px hsla(0 0% 0% / 0.1), 0 4px 6px -2px hsla(0 0% 0% / 0.05);
+  --dcc-shadow-glow-cyan: 0 0 20px hsla(190 100% 50% / 0.4);
+  --dcc-shadow-glow-purple: 0 0 20px hsla(270 80% 60% / 0.4);
+  
+  // 圆角
+  --dcc-radius-sm: 8px;
+  --dcc-radius-md: 12px;
+  --dcc-radius-lg: 16px;
+  --dcc-radius-xl: 20px;
+  
+  // 间距
+  --dcc-spacing-xs: 8px;
+  --dcc-spacing-sm: 12px;
+  --dcc-spacing-md: 16px;
+  --dcc-spacing-lg: 24px;
+  --dcc-spacing-xl: 32px;
+  
+  // 字体
+  --dcc-font-size-xs: 12px;
+  --dcc-font-size-sm: 13px;
+  --dcc-font-size-md: 14px;
+  --dcc-font-size-lg: 15px;
+  --dcc-font-size-xl: 16px;
+  --dcc-font-size-2xl: 20px;
+  --dcc-font-size-3xl: 24px;
+  --dcc-font-size-4xl: 28px;
+}
+
+// 混合器 - 玻璃态卡片
+@mixin glass-card {
+  background: var(--dcc-bg-card);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--dcc-border-color);
+  border-radius: var(--dcc-radius-lg);
+  box-shadow: var(--dcc-shadow-md), inset 0 1px 0 0 hsla(255 255% 255% / 0.05);
+  transition: all 0.3s ease;
+  
+  &:hover {
+    border-color: var(--dcc-border-color-hover);
+    box-shadow: var(--dcc-shadow-glow-cyan), var(--dcc-shadow-md);
+  }
+}
+
+// 混合器 - 玻璃态卡片（无悬停效果）
+@mixin glass-card-static {
+  background: var(--dcc-bg-card);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--dcc-border-color);
+  border-radius: var(--dcc-radius-lg);
+  box-shadow: var(--dcc-shadow-md), inset 0 1px 0 0 hsla(255 255% 255% / 0.05);
+}
+
+// 混合器 - 渐变文字
+@mixin gradient-text {
+  background: var(--dcc-gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+// 混合器 - 渐变按钮
+@mixin gradient-button {
+  background: var(--dcc-gradient-primary);
+  border: none;
+  box-shadow: 0 4px 14px hsla(190 100% 50% / 0.3);
+  transition: all 0.3s ease;
+  
+  &:hover {
+    box-shadow: 0 6px 20px hsla(190 100% 50% / 0.5);
+    transform: translateY(-1px);
+  }
+}
+
+// 混合器 - 页面容器
+@mixin page-container {
+  padding: var(--dcc-spacing-lg);
+  background: var(--dcc-bg-primary);
+  min-height: 100vh;
+  color: var(--dcc-text-primary);
+  background-image: 
+    radial-gradient(ellipse at 20% 20%, hsla(280 60% 50% / 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, hsla(190 80% 50% / 0.06) 0%, transparent 50%);
+}
+
+// 混合器 - 页面标题
+@mixin page-title {
+  font-size: var(--dcc-font-size-4xl);
+  font-weight: 700;
+  margin: 0 0 var(--dcc-spacing-xs) 0;
+  color: var(--dcc-text-primary);
+  letter-spacing: -0.02em;
+  @include gradient-text;
+}
+
+// 混合器 - 卡片标题
+@mixin card-title {
+  margin: 0 0 var(--dcc-spacing-md) 0;
+  font-size: var(--dcc-font-size-xl);
+  font-weight: 600;
+  color: var(--dcc-text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--dcc-spacing-sm);
+  
+  &::before {
+    content: '';
+    width: 4px;
+    height: 18px;
+    background: var(--dcc-gradient-primary);
+    border-radius: 2px;
+  }
+}
+
+// 混合器 - 输入框样式
+@mixin dcc-input {
+  background: var(--dcc-bg-input);
+  border-color: var(--dcc-border-color);
+  color: var(--dcc-text-primary);
+  border-radius: var(--dcc-radius-md);
+  
+  &:focus {
+    border-color: var(--dcc-accent-cyan);
+    box-shadow: 0 0 0 2px hsla(190 100% 50% / 0.1);
+  }
+}
+
+// 动画 - 脉冲
+@keyframes pulse-cyan {
+  0%, 100% { box-shadow: 0 0 20px hsla(190 100% 50% / 0.4); }
+  50% { box-shadow: 0 0 30px hsla(190 100% 50% / 0.6); }
+}
+
+// 动画 - 发光
+@keyframes glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
